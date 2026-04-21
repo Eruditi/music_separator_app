@@ -42,7 +42,7 @@ class AppColors:
 class AppConfig:
     """应用程序配置"""
     APP_NAME = "本地音乐多轨分离工具"
-    VERSION = "1.1.0"
+    VERSION = "1.2.0"
     BUILD_DATE = "2025-04-21"
     
     # 路径配置
@@ -61,6 +61,16 @@ class AppConfig:
     DEFAULT_CACHE_SIZE = "1 GB"
     ENABLE_GPU = True
     MAX_FILE_SIZE_MB = 500
+    
+    # 内存优化配置
+    MAX_MEMORY_USAGE_PERCENT = 80  # 最大内存使用百分比
+    CHUNK_SIZE_MB = 50  # 音频处理分块大小(MB)
+    ENABLE_MEMORY_MONITOR = True  # 启用内存监控
+    
+    # 音频处理优化
+    DEFAULT_DOWNSAMPLE_RATE = 22050  # 默认降采样率
+    WAVEFORM_DOWNSAMPLE_FACTOR = 1000  # 波形显示降采样因子
+    MAX_WAVEFORM_POINTS = 1500  # 波形显示最大点数
 
 class ModelConfig:
     """模型配置"""

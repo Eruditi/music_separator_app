@@ -126,3 +126,162 @@ def get_audio_file_info(file_path):
     }
 
 
+def validate_audio_file(file_path):
+    """
+    验证音频文件是否有效
+    
+    Args:
+        file_path: 音频文件路径
+        
+    Returns:
+        tuple: (是否有效, 错误信息, 文件信息字典)
+    """
+    logger = logging.getLogger(__name__)
+    
+    # 检查文件是否存在
+    if not os.path.exists(file_path):
+        return False, "文件不存在", None
+    
+    # 检查是否为文件
+    if not os.path.isfile(file_path):
+        return False, "路径不是文件", None
+    
+    # 检查文件扩展名
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext not in AppConfig.SUPPORTED_FORMATS:
+        supported = ', '.join(AppConfig.SUPPORTED_FORMATS)
+        return False, f"不支持的文件格式: {ext}\n支持的格式: {supported}", None
+    
+    # 检查文件大小
+    file_size = os.path.getsize(file_path)
+    if file_size == 0:
+        return False, "文件为空", None
+    
+    max_size = AppConfig.MAX_FILE_SIZE_MB * 1024 * 1024
+    if file_size > max_size:
+        return False, f"文件过大: {format_file_size(file_size)}\n最大支持: {AppConfig.MAX_FILE_SIZE_MB}MB", None
+    
+    # 尝试读取音频文件头部信息
+    file_info = {
+        'path': file_path,
+        'size': file_size,
+        'size_formatted': format_file_size(file_size),
+        'extension': ext,
+        'format_valid': False,
+        'duration': None,
+        'sample_rate': None,
+        'channels': None
+    }
+    
+    # 使用librosa验证音频文件
+    try:
+        import librosa
+        info = librosa.info(file_path)
+        file_info['duration'] = info.duration
+        file_info['sample_rate'] = info.sample_rate
+        file_info['channels'] = info.channels
+        file_info['format_valid'] = True
+        
+        logger.info(f"✅ 音频文件验证通过: {os.path.basename(file_path)}")
+        logger.info(f"   时长: {info.duration:.2f}秒, 采样率: {info.sample_rate}Hz, 声道: {info.channels}")
+        
+        return True, None, file_info
+        
+    except ImportError:
+        logger.warning("librosa未安装，跳过音频格式验证")
+        file_info['format_valid'] = True
+        return True, None, file_info
+        
+    except Exception as e:
+        logger.error(f"❌ 音频文件验证失败: {str(e)}")
+        return False, f"音频文件格式错误或已损坏: {str(e)}", file_info
+
+
+def get_system_info():
+    """
+    获取系统信息
+    
+    Returns:
+        dict: 系统信息字典
+    """
+    info = {
+        'python_version': sys.version,
+        'platform': sys.platform,
+        'os_name': os.name,
+        'cpu_count': os.cpu_count(),
+    }
+    
+    # 获取内存信息
+    try:
+        import psutil
+        mem = psutil.virtual_memory()
+        info['total_memory'] = format_file_size(mem.total)
+        info['available_memory'] = format_file_size(mem.available)
+        info['memory_percent'] = mem.percent
+    except ImportError:
+        info['total_memory'] = "未知"
+        info['available_memory'] = "未知"
+    
+    # 获取GPU信息
+    try:
+        import torch
+        info['cuda_available'] = torch.cuda.is_available()
+        if torch.cuda.is_available():
+            info['cuda_version'] = torch.version.cuda
+            info['gpu_count'] = torch.cuda.device_count()
+            info['gpu_name'] = torch.cuda.get_device_name(0)
+        else:
+            info['cuda_version'] = None
+            info['gpu_count'] = 0
+            info['gpu_name'] = None
+    except ImportError:
+        info['cuda_available'] = False
+        info['cuda_version'] = None
+        info['gpu_count'] = 0
+        info['gpu_name'] = None
+    
+    return info
+
+
+def cleanup_temp_files(temp_dir=None):
+    """
+    清理临时文件
+    
+    Args:
+        temp_dir: 临时文件目录，默认为系统临时目录
+        
+    Returns:
+        int: 清理的文件数量
+    """
+    import tempfile
+    import glob
+    
+    logger = logging.getLogger(__name__)
+    
+    if temp_dir is None:
+        temp_dir = tempfile.gettempdir()
+    
+    cleaned_count = 0
+    
+    # 清理常见的临时文件模式
+    patterns = ['*.tmp', '*.temp', '*_separated_*']
+    
+    for pattern in patterns:
+        try:
+            files = glob.glob(os.path.join(temp_dir, pattern))
+            for file_path in files:
+                try:
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                        cleaned_count += 1
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    
+    if cleaned_count > 0:
+        logger.info(f"🧹 清理了 {cleaned_count} 个临时文件")
+    
+    return cleaned_count
+
+
