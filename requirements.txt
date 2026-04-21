@@ -20,3 +20,6 @@ scipy>=1.9.0
 
 # 系统工具
 psutil>=5.9.0
+
+# 类型注解兼容
+typing-extensions>=4.0.0

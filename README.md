@@ -171,6 +171,13 @@ A: 日志文件保存在 `logs/` 目录下，文件名格式为 `music_separator
 
 ## 更新日志
 
+### v1.5.0 (2026-04-21)
+- **Bug修复**: 修复 `main.py` 中 `SettingsDialog` 类定义缺失的问题，该问题导致设置对话框方法被错误地放在 `AudioWaveformWidget` 类内部
+- **Bug修复**: 合并 `main.py` 中重复的 `closeEvent` 方法，统一窗口关闭时的状态保存和线程清理逻辑
+- **代码优化**: 为 `models.py` 添加完整的类型注解（Type Hints），提升代码可读性和IDE智能提示
+- **依赖更新**: 在 `requirements.txt` 中添加 `typing-extensions` 以确保类型注解兼容性
+- **文档完善**: 更新模块文档字符串，统一代码注释风格
+
 ### v1.4.0 (2026-04-21)
 - 添加 `.gitignore` 文件，优化仓库管理
 - 优化日志系统，支持日志轮转（RotatingFileHandler，10MB×5备份）

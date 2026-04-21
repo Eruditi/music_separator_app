@@ -403,7 +403,16 @@ class AudioWaveformWidget(QWidget):
         painter.drawText(self.rect(), Qt.AlignCenter, "正在加载...")
 
 
-        
+class SettingsDialog(QDialog):
+    """设置对话框 - 提供高级配置选项"""
+
+    def __init__(self, parent=None):
+        """初始化设置对话框"""
+        super().__init__(parent)
+        self.setWindowTitle("高级设置")
+        self.setMinimumSize(600, 500)
+        self.init_ui()
+
     def init_ui(self):
         """初始化UI组件"""
         layout = QVBoxLayout(self)
@@ -1402,11 +1411,6 @@ class MusicSeparatorMainWindow(QMainWindow):
         except Exception as e:
             logger.error(f"保存窗口状态失败: {e}")
 
-    def closeEvent(self, event):
-        """窗口关闭事件，保存窗口状态"""
-        self.save_window_state()
-        event.accept()
-
     def init_window(self):
         """
         初始化窗口属性
@@ -2023,21 +2027,24 @@ class MusicSeparatorMainWindow(QMainWindow):
     def closeEvent(self, event):
         """
         窗口关闭事件处理
-        确保线程正确清理，防止闪退
+        保存窗口状态并确保线程正确清理，防止闪退
         """
         try:
+            # 保存窗口状态
+            self.save_window_state()
+
             # 清理分离线程
             if self.separation_thread and self.separation_thread.isRunning():
                 self.separation_thread.is_running = False
                 self.separation_thread.quit()
                 self.separation_thread.wait(3000)  # 等待最多3秒
-            
+
             # 清理音频加载线程
             if hasattr(self, 'waveform_widget') and hasattr(self.waveform_widget, 'load_thread'):
                 if self.waveform_widget.load_thread and self.waveform_widget.load_thread.isRunning():
                     self.waveform_widget.load_thread.quit()
                     self.waveform_widget.load_thread.wait(2000)
-            
+
             event.accept()
         except Exception as e:
             print(f"关闭窗口时出错: {e}")
