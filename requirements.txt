@@ -1,0 +1,22 @@
+# 音频处理和AI模型
+torch>=2.0.0
+torchaudio>=2.0.0
+demucs>=4.0.0
+spleeter>=2.3.0
+tensorflow>=2.10.0
+
+# 音频处理
+librosa>=0.10.0
+soundfile>=0.12.0
+ffmpeg-python>=0.2.0
+
+# GUI和界面
+PyQt5>=5.15.0
+PyQt5-tools>=5.15.0
+
+# 数值计算
+numpy>=1.21.0
+scipy>=1.9.0
+
+# 系统工具
+psutil>=5.9.0
