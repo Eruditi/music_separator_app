@@ -8,6 +8,7 @@ import os
 import json
 import logging
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 from config import AppConfig
 
 logger = logging.getLogger(__name__)
@@ -16,13 +17,13 @@ logger = logging.getLogger(__name__)
 class SettingsManager:
     """设置管理器 - 处理用户配置的保存和加载"""
     
-    def __init__(self):
+    def __init__(self) -> None:
         """初始化设置管理器"""
-        self.config_file = os.path.join(AppConfig.BASE_DIR, 'settings.json')
-        self.default_settings = self._get_default_settings()
-        self.current_settings = self.load_settings()
+        self.config_file: str = os.path.join(AppConfig.BASE_DIR, 'settings.json')
+        self.default_settings: Dict[str, Any] = self._get_default_settings()
+        self.current_settings: Dict[str, Any] = self.load_settings()
     
-    def _get_default_settings(self):
+    def _get_default_settings(self) -> Dict[str, Any]:
         """获取默认设置"""
         return {
             "audio": {
@@ -61,17 +62,17 @@ class SettingsManager:
             }
         }
     
-    def load_settings(self):
+    def load_settings(self) -> Dict[str, Any]:
         """
         从配置文件加载设置
         
         Returns:
-            dict: 当前设置字典
+            Dict[str, Any]: 当前设置字典
         """
         try:
             if os.path.exists(self.config_file):
                 with open(self.config_file, 'r', encoding='utf-8') as f:
-                    loaded_settings = json.load(f)
+                    loaded_settings: Dict[str, Any] = json.load(f)
                 
                 # 合并默认设置和加载的设置（处理新增配置项）
                 merged_settings = self._merge_settings(self.default_settings, loaded_settings)
@@ -88,7 +89,7 @@ class SettingsManager:
             logger.error(f"❌ 加载设置失败: {str(e)}，使用默认设置")
             return self.default_settings.copy()
     
-    def save_settings(self, settings=None):
+    def save_settings(self, settings: Optional[Dict[str, Any]] = None) -> bool:
         """
         保存设置到配置文件
         
@@ -118,7 +119,7 @@ class SettingsManager:
             logger.error(f"❌ 保存设置失败: {str(e)}")
             return False
     
-    def get_setting(self, key_path, default=None):
+    def get_setting(self, key_path: Union[str, List[str]], default: Any = None) -> Any:
         """
         获取指定路径的设置值
         
@@ -127,7 +128,7 @@ class SettingsManager:
             default: 默认值
             
         Returns:
-            设置值或默认值
+            Any: 设置值或默认值
         """
         try:
             if isinstance(key_path, str):
@@ -135,7 +136,7 @@ class SettingsManager:
             else:
                 keys = key_path
             
-            value = self.current_settings
+            value: Any = self.current_settings
             for key in keys:
                 value = value[key]
             return value
@@ -143,7 +144,7 @@ class SettingsManager:
         except (KeyError, TypeError):
             return default
     
-    def set_setting(self, key_path, value):
+    def set_setting(self, key_path: Union[str, List[str]], value: Any) -> bool:
         """
         设置指定路径的设置值
         
@@ -161,7 +162,7 @@ class SettingsManager:
                 keys = key_path
             
             # 遍历到倒数第二个key
-            target = self.current_settings
+            target: Dict[str, Any] = self.current_settings
             for key in keys[:-1]:
                 if key not in target:
                     target[key] = {}
@@ -175,7 +176,7 @@ class SettingsManager:
             logger.error(f"❌ 设置值失败 {key_path}: {str(e)}")
             return False
     
-    def reset_to_defaults(self):
+    def reset_to_defaults(self) -> bool:
         """
         重置为默认设置
         
@@ -185,7 +186,7 @@ class SettingsManager:
         self.current_settings = self.default_settings.copy()
         return self.save_settings()
     
-    def _merge_settings(self, default, loaded):
+    def _merge_settings(self, default: Dict[str, Any], loaded: Dict[str, Any]) -> Dict[str, Any]:
         """
         递归合并设置，确保新增的配置项也被包含
         
@@ -194,7 +195,7 @@ class SettingsManager:
             loaded: 已加载的设置
             
         Returns:
-            dict: 合并后的设置
+            Dict[str, Any]: 合并后的设置
         """
         result = default.copy()
         
@@ -209,31 +210,31 @@ class SettingsManager:
         
         return result
     
-    def validate_settings(self):
+    def validate_settings(self) -> Tuple[bool, List[str]]:
         """
         验证当前设置的有效性
         
         Returns:
-            tuple: (是否有效, 错误信息列表)
+            Tuple[bool, List[str]]: (是否有效, 错误信息列表)
         """
-        errors = []
+        errors: List[str] = []
         
         # 验证音频设置
-        audio = self.current_settings.get('audio', {})
+        audio: Dict[str, Any] = self.current_settings.get('audio', {})
         if audio.get('sample_rate') not in [22050, 44100, 48000]:
             errors.append("无效的采样率设置")
         if audio.get('bit_depth') not in [16, 24, 32]:
             errors.append("无效的位深度设置")
         
         # 验证模型设置
-        model = self.current_settings.get('model', {})
+        model: Dict[str, Any] = self.current_settings.get('model', {})
         if not (1 <= model.get('shifts', 1) <= 10):
             errors.append("shifts值必须在1-10之间")
         if not (0.1 <= model.get('overlap', 0.25) <= 0.5):
             errors.append("overlap值必须在0.1-0.5之间")
         
         # 验证性能设置
-        performance = self.current_settings.get('performance', {})
+        performance: Dict[str, Any] = self.current_settings.get('performance', {})
         if not (1 <= performance.get('threads', 4) <= 16):
             errors.append("线程数必须在1-16之间")
         
@@ -241,9 +242,9 @@ class SettingsManager:
 
 
 # 全局设置管理器实例
-_settings_manager = None
+_settings_manager: Optional[SettingsManager] = None
 
-def get_settings_manager():
+def get_settings_manager() -> SettingsManager:
     """获取全局设置管理器实例（单例模式）"""
     global _settings_manager
     if _settings_manager is None:

@@ -115,8 +115,10 @@ music_separator_app/
 ├── models.py            # 音频分离模型实现
 ├── config.py            # 配置常量和UI样式
 ├── utils.py             # 工具函数和日志配置
+├── settings_manager.py  # 用户配置持久化管理
 ├── requirements.txt     # 项目依赖列表
 ├── README.md           # 项目说明文档
+├── .gitignore          # Git忽略文件配置
 ├── ffmpeg/             # FFmpeg二进制文件
 │   └── bin/
 ├── pretrained_models/   # AI模型存储目录
@@ -168,6 +170,13 @@ A: 使用GPU加速、增加RAM、使用SSD存储都可以提高处理速度。
 A: 日志文件保存在 `logs/` 目录下，文件名格式为 `music_separator_YYYYMMDD.log`。
 
 ## 更新日志
+
+### v1.4.0 (2026-04-21)
+- 添加 `.gitignore` 文件，优化仓库管理
+- 优化日志系统，支持日志轮转（RotatingFileHandler，10MB×5备份）
+- 为 `settings_manager.py` 添加完整的类型注解（Type Hints）
+- 完善文档字符串，提升代码可维护性
+- 更新构建日期和版本号
 
 ### v1.3.0 (2025-04-21)
 - 优化音频分离处理流程，添加5步骤进度报告

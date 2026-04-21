@@ -15,7 +15,7 @@ _logging_initialized = False
 
 
 def setup_detailed_logging():
-    """设置详细的日志记录系统"""
+    """设置详细的日志记录系统，支持日志轮转"""
     global _logging_initialized
     
     if _logging_initialized:
@@ -30,12 +30,22 @@ def setup_detailed_logging():
     if not os.path.exists(logs_dir):
         os.makedirs(logs_dir, exist_ok=True)
     
-    # 创建日志文件
+    # 创建日志文件路径
     log_file_name = f"music_separator_{datetime.datetime.now().strftime('%Y%m%d')}.log"
     log_file_path = os.path.join(logs_dir, log_file_name)
     
-    # 创建文件处理器
-    file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+    # 创建文件处理器（支持日志轮转）
+    try:
+        from logging.handlers import RotatingFileHandler
+        file_handler = RotatingFileHandler(
+            log_file_path, 
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5,
+            encoding='utf-8'
+        )
+    except ImportError:
+        file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+    
     file_handler.setLevel(logging.DEBUG)
     file_formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
