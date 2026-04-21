@@ -20,10 +20,12 @@ from config import AppColors, AppConfig, UIStyles
 warnings.filterwarnings("ignore", category=DeprecationWarning, module=".*sip.*")
 warnings.filterwarnings("ignore", message=".*sipPyTypeDict.*")
 
-from utils import setup_detailed_logging, log_system_info, get_audio_file_info
+from utils import setup_detailed_logging, log_system_info, get_audio_file_info, validate_audio_file, get_system_info, cleanup_temp_files
+from settings_manager import get_settings_manager
 
 log_file_path = None
 logger = logging.getLogger(__name__)
+settings = get_settings_manager()
 
 
 def check_dependencies():

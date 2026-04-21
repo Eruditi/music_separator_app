@@ -155,12 +155,13 @@ class DemucsModel(BaseModel):
         except Exception:
             return f"Demucs模型: {self.model_type}"
 
-    def separate(self, audio_path, output_dir):
+    def separate(self, audio_path, output_dir, progress_callback=None):
         """使用Demucs模型分离音频
 
         Args:
             audio_path: 输入音频文件路径
             output_dir: 输出目录路径
+            progress_callback: 进度回调函数，接收(当前步骤, 总步骤, 描述)参数
 
         Returns:
             分离后的音频文件路径列表
@@ -168,6 +169,13 @@ class DemucsModel(BaseModel):
         import os
         import time
         import torch
+        import gc
+        
+        def report_progress(step, total, description):
+            """报告进度"""
+            if progress_callback:
+                progress_callback(step, total, description)
+            self.logger.info(f"[进度] {step}/{total} - {description}")
         
         # 确保输出目录存在
         os.makedirs(output_dir, exist_ok=True)
@@ -178,17 +186,45 @@ class DemucsModel(BaseModel):
 
         try:
             start_time = time.time()
+            total_steps = 5
+            current_step = 0
+            
+            # 步骤1: 验证音频文件
+            current_step += 1
+            report_progress(current_step, total_steps, "验证音频文件...")
+            
+            from utils import validate_audio_file
+            is_valid, error_msg, file_info = validate_audio_file(audio_path)
+            if not is_valid:
+                raise ValueError(f"音频文件验证失败: {error_msg}")
+            
+            self.logger.info(f"[文件信息] 大小: {file_info['size_formatted']}, "
+                           f"时长: {file_info.get('duration', '未知')}秒")
+            
+            # 步骤2: 加载模型
+            current_step += 1
+            report_progress(current_step, total_steps, "加载AI模型...")
             self.logger.info("[模型加载] 开始加载模型...")
             self.logger.debug(f"[模型加载] 模型类型: {self.model_type}")
             self.logger.info(f"[模型加载] 成功加载 {self.model_type} 模型")
         
-            # 读取音频文件
+            # 步骤3: 读取音频文件
+            current_step += 1
+            report_progress(current_step, total_steps, "读取音频文件...")
             self.logger.info("[音频处理] 开始读取音频文件...")
             self.logger.debug(f"[音频处理] 输入文件: {audio_path}")
-            f = AudioFile(audio_path)
-            wav = f.read(streams=0, samplerate=self.model.samplerate)
-            wav = wav.mean(0, keepdim=True)
+            
+            try:
+                f = AudioFile(audio_path)
+                wav = f.read(streams=0, samplerate=self.model.samplerate)
+                wav = wav.mean(0, keepdim=True)
+            except Exception as e:
+                raise RuntimeError(f"读取音频文件失败: {str(e)}")
         
+            # 步骤4: 执行分离
+            current_step += 1
+            report_progress(current_step, total_steps, "AI推理分离音轨...")
+            
             # 移动到GPU（如果可用）
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             self.logger.info(f"[设备信息] 使用设备: {device}")
@@ -199,12 +235,17 @@ class DemucsModel(BaseModel):
         
             # 执行分离
             self.logger.info("[音频分离] 开始Demucs分离处理...")
+            
+            # 使用配置参数
+            shifts = getattr(self, 'shifts', 1)
+            overlap = getattr(self, 'overlap', 0.25)
+            
             sources = apply_model(
                 self.model,
                 wav,
                 device=device,
-                shifts=1,
-                overlap=0.25,
+                shifts=shifts,
+                overlap=overlap,
                 progress=True
             )
             
@@ -219,6 +260,10 @@ class DemucsModel(BaseModel):
             elapsed_time = time.time() - start_time
             self.logger.info(f"[音频分离] 模型推理完成，分离出{len(sources)}个轨道")
             
+            # 步骤5: 保存输出文件
+            current_step += 1
+            report_progress(current_step, total_steps, "保存分离后的音轨...")
+            
             # 生成输出文件
             output_files = []
             base_name = os.path.splitext(os.path.basename(audio_path))[0]
@@ -226,46 +271,87 @@ class DemucsModel(BaseModel):
             # 根据轨道数处理输出
             if self.stems == 2:
                 # 2轨模式：人声 + 伴奏
-                # 假设第一个轨道是人声，其余轨道合并为伴奏
-                vocals = sources[0]
-                accompaniment = sum(sources[1:]) if len(sources) > 1 else torch.zeros_like(vocals)
-                
-                # 保存人声轨道
-                vocals_path = os.path.join(output_dir, f"{base_name}_vocals.wav")
-                save_audio(vocals.cpu(), vocals_path, samplerate=self.model.samplerate)
-                output_files.append(vocals_path)
-                self.logger.info(f"[轨道生成] vocals: {vocals_path}")
-                
-                # 保存伴奏轨道
-                accompaniment_path = os.path.join(output_dir, f"{base_name}_accompaniment.wav")
-                save_audio(accompaniment.cpu(), accompaniment_path, samplerate=self.model.samplerate)
-                output_files.append(accompaniment_path)
-                self.logger.info(f"[轨道生成] accompaniment: {accompaniment_path}")
+                output_files = self._save_2stems(sources, base_name, output_dir)
             else:
                 # 4轨或6轨模式：分别保存每个轨道
-                track_names = []
-                if self.stems == 4:
-                    track_names = ['drums', 'bass', 'other', 'vocals']
-                elif self.stems == 6:
-                    track_names = ['drums', 'bass', 'other', 'vocals', 'piano', 'guitar']
-                
-                for i, stem_name in enumerate(track_names):
-                    if i < len(sources):
-                        stem_audio = sources[i].cpu()
-                        stem_path = os.path.join(output_dir, f"{base_name}_{stem_name}.wav")
-                        save_audio(stem_audio, stem_path, samplerate=self.model.samplerate)
-                        output_files.append(stem_path)
-                        self.logger.info(f"[轨道生成] {stem_name}: {stem_path}")
+                output_files = self._save_multistem(sources, base_name, output_dir)
         
             self.logger.info(f"[处理总结] 音频分离完成，耗时: {elapsed_time:.2f}秒")
             self.logger.info(f"[处理总结] 共生成{len(output_files)}个轨道文件，保存至: {output_dir}")
+            
+            # 清理GPU内存
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
+            
             return output_files
+            
         except KeyboardInterrupt:
             self.logger.info("用户中断了处理过程")
             return []
         except Exception as e:
             self.logger.error(f"Demucs处理失败: {str(e)}", exc_info=True)
             raise
+    
+    def _save_2stems(self, sources, base_name, output_dir):
+        """保存2轨分离结果（人声+伴奏）
+        
+        Args:
+            sources: 分离后的音频源列表
+            base_name: 输出文件基础名称
+            output_dir: 输出目录
+            
+        Returns:
+            list: 输出文件路径列表
+        """
+        import torch
+        output_files = []
+        
+        # 假设第一个轨道是人声，其余轨道合并为伴奏
+        vocals = sources[0]
+        accompaniment = sum(sources[1:]) if len(sources) > 1 else torch.zeros_like(vocals)
+        
+        # 保存人声轨道
+        vocals_path = os.path.join(output_dir, f"{base_name}_vocals.wav")
+        save_audio(vocals.cpu(), vocals_path, samplerate=self.model.samplerate)
+        output_files.append(vocals_path)
+        self.logger.info(f"[轨道生成] vocals: {vocals_path}")
+        
+        # 保存伴奏轨道
+        accompaniment_path = os.path.join(output_dir, f"{base_name}_accompaniment.wav")
+        save_audio(accompaniment.cpu(), accompaniment_path, samplerate=self.model.samplerate)
+        output_files.append(accompaniment_path)
+        self.logger.info(f"[轨道生成] accompaniment: {accompaniment_path}")
+        
+        return output_files
+    
+    def _save_multistem(self, sources, base_name, output_dir):
+        """保存多轨分离结果
+        
+        Args:
+            sources: 分离后的音频源列表
+            base_name: 输出文件基础名称
+            output_dir: 输出目录
+            
+        Returns:
+            list: 输出文件路径列表
+        """
+        output_files = []
+        
+        # 获取轨道名称
+        track_names = self.TRACK_NAMES.get(self.stems, [])
+        if not track_names:
+            track_names = [f"stem_{i}" for i in range(len(sources))]
+        
+        for i, stem_name in enumerate(track_names):
+            if i < len(sources):
+                stem_audio = sources[i].cpu()
+                stem_path = os.path.join(output_dir, f"{base_name}_{stem_name}.wav")
+                save_audio(stem_audio, stem_path, samplerate=self.model.samplerate)
+                output_files.append(stem_path)
+                self.logger.info(f"[轨道生成] {stem_name}: {stem_path}")
+        
+        return output_files
 
 class ModelFactory:
     @staticmethod

@@ -42,7 +42,7 @@ class AppColors:
 class AppConfig:
     """应用程序配置"""
     APP_NAME = "本地音乐多轨分离工具"
-    VERSION = "1.2.0"
+    VERSION = "1.3.0"
     BUILD_DATE = "2025-04-21"
     
     # 路径配置
